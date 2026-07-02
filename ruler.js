@@ -33,7 +33,8 @@
             if (window.utools && window.utools.dbStorage) {
                 window.utools.dbStorage.setItem('rulerState', JSON.stringify({
                     isHorizontal: isHorizontal,
-                    rulerLength: rulerLength
+                    rulerLength: rulerLength,
+                    bgR: bgR, bgG: bgG, bgB: bgB, bgA: bgA
                 }));
             }
         } catch (e) {}
@@ -50,6 +51,12 @@
                     }
                     if (typeof state.rulerLength === 'number' && state.rulerLength >= MIN_LENGTH && state.rulerLength <= MAX_LENGTH) {
                         rulerLength = state.rulerLength;
+                    }
+                    if (typeof state.bgR === 'number' && typeof state.bgG === 'number' && typeof state.bgB === 'number' && typeof state.bgA === 'number') {
+                        bgR = state.bgR; bgG = state.bgG; bgB = state.bgB; bgA = state.bgA;
+                        COLORS.bgGradientStart = 'rgba(' + bgR + ',' + bgG + ',' + bgB + ',' + bgA + ')';
+                        COLORS.bgGradientEnd = 'rgba(' + Math.max(0, bgR - 25) + ',' + Math.max(0, bgG - 20) + ',' + Math.max(0, bgB - 15) + ',' + bgA + ')';
+                        pickerHue = 0; pickerSat = 1; pickerVal = 1; pickerAlpha = bgA;
                     }
                 }
             }
@@ -72,6 +79,42 @@
     let isOnRuler = false;
     let dpr = window.devicePixelRatio || 1;
 
+    // Background color
+    let bgR = 45, bgG = 55, bgB = 72, bgA = 1.0;
+
+    // Context menu
+    const contextMenu = document.getElementById('contextMenu');
+    const menuChangeBg = document.getElementById('menuChangeBg');
+    const menuClose = document.getElementById('menuClose');
+
+    // Color picker
+    const colorPicker = document.getElementById('colorPicker');
+    const satBrightCanvas = document.getElementById('satBrightCanvas');
+    const satBrightCtx = satBrightCanvas.getContext('2d');
+    const hueCanvas = document.getElementById('hueCanvas');
+    const hueCtx = hueCanvas.getContext('2d');
+    const alphaCanvas = document.getElementById('alphaCanvas');
+    const alphaCtx = alphaCanvas.getContext('2d');
+    const sbCursor = document.getElementById('sbCursor');
+    const hueCursor = document.getElementById('hueCursor');
+    const alphaCursor = document.getElementById('alphaCursor');
+    const rgbaInput = document.getElementById('rgbaInput');
+    const btnClear = document.getElementById('btnClear');
+    const btnConfirm = document.getElementById('btnConfirm');
+
+    let pickerHue = 0;
+    let pickerSat = 1.0;
+    let pickerVal = 1.0;
+    let pickerAlpha = 1.0;
+    let draggingSB = false;
+    let draggingHue = false;
+    let draggingAlpha = false;
+    let colorPickerVisible = false;
+
+    // Double-right-click close
+    let rightClickTimer = null;
+    let rightClickCount = 0;
+
     function initCanvas() {
         dpr = window.devicePixelRatio || 1;
         const totalLength = rulerLength + START_PAD * 2;
@@ -93,15 +136,12 @@
     function draw() {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-
         drawRulerBackground();
-
         if (isHorizontal) {
             drawHorizontalTicks();
         } else {
             drawVerticalTicks();
         }
-
         drawResizeHandles();
     }
 
@@ -109,11 +149,9 @@
         const totalLen = rulerLength + START_PAD * 2;
         const rectW = isHorizontal ? totalLen : RULER_THICKNESS;
         const rectH = isHorizontal ? RULER_THICKNESS : totalLen;
-
         const grad = ctx.createLinearGradient(0, 0, rectW, rectH);
         grad.addColorStop(0, COLORS.bgGradientStart);
         grad.addColorStop(1, COLORS.bgGradientEnd);
-
         ctx.fillStyle = grad;
         roundRect(ctx, 0, 0, rectW, rectH, 4);
         ctx.fill();
@@ -135,40 +173,20 @@
 
     function drawHorizontalTicks() {
         const baseY = RULER_THICKNESS - 6;
-
         for (let i = 0; i <= rulerLength; i++) {
             let tickH, lineWidth, color;
             const x = i + START_PAD;
-
-            if (i % 100 === 0) {
-                tickH = 22;
-                lineWidth = 1.5;
-                color = COLORS.tickMajor;
-            } else if (i % 50 === 0) {
-                tickH = 16;
-                lineWidth = 1.2;
-                color = COLORS.tickMid;
-            } else if (i % 10 === 0) {
-                tickH = 12;
-                lineWidth = 1;
-                color = COLORS.tickMid;
-            } else if (i % 5 === 0) {
-                tickH = 8;
-                lineWidth = 0.8;
-                color = COLORS.tickMinor;
-            } else {
-                tickH = 4;
-                lineWidth = 0.5;
-                color = COLORS.tickPixel;
-            }
-
+            if (i % 100 === 0) { tickH = 22; lineWidth = 1.5; color = COLORS.tickMajor; }
+            else if (i % 50 === 0) { tickH = 16; lineWidth = 1.2; color = COLORS.tickMid; }
+            else if (i % 10 === 0) { tickH = 12; lineWidth = 1; color = COLORS.tickMid; }
+            else if (i % 5 === 0) { tickH = 8; lineWidth = 0.8; color = COLORS.tickMinor; }
+            else { tickH = 4; lineWidth = 0.5; color = COLORS.tickPixel; }
             ctx.strokeStyle = color;
             ctx.lineWidth = lineWidth;
             ctx.beginPath();
             ctx.moveTo(x + 0.5, baseY);
             ctx.lineTo(x + 0.5, baseY - tickH);
             ctx.stroke();
-
             if (i % 100 === 0) {
                 ctx.font = 'bold 11px "Segoe UI", sans-serif';
                 ctx.fillStyle = COLORS.label;
@@ -177,19 +195,16 @@
                 ctx.fillText(i + '', x, baseY - tickH - 3);
             }
         }
-
         if (hoverValue >= 0 && hoverValue <= rulerLength) {
             const hx = hoverValue + START_PAD;
             ctx.fillStyle = COLORS.hoverBg;
             ctx.fillRect(Math.max(START_PAD, hx - 15), 0, 30, RULER_THICKNESS);
-
             ctx.strokeStyle = COLORS.hoverLine;
             ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.moveTo(hx + 0.5, 0);
             ctx.lineTo(hx + 0.5, RULER_THICKNESS);
             ctx.stroke();
-
             ctx.font = 'bold 10px "Segoe UI", sans-serif';
             ctx.fillStyle = COLORS.hoverLine;
             ctx.textAlign = 'center';
@@ -200,40 +215,20 @@
 
     function drawVerticalTicks() {
         const baseX = RULER_THICKNESS - 6;
-
         for (let i = 0; i <= rulerLength; i++) {
             let tickW, lineWidth, color;
             const y = i + START_PAD;
-
-            if (i % 100 === 0) {
-                tickW = 22;
-                lineWidth = 1.5;
-                color = COLORS.tickMajor;
-            } else if (i % 50 === 0) {
-                tickW = 16;
-                lineWidth = 1.2;
-                color = COLORS.tickMid;
-            } else if (i % 10 === 0) {
-                tickW = 12;
-                lineWidth = 1;
-                color = COLORS.tickMid;
-            } else if (i % 5 === 0) {
-                tickW = 8;
-                lineWidth = 0.8;
-                color = COLORS.tickMinor;
-            } else {
-                tickW = 4;
-                lineWidth = 0.5;
-                color = COLORS.tickPixel;
-            }
-
+            if (i % 100 === 0) { tickW = 22; lineWidth = 1.5; color = COLORS.tickMajor; }
+            else if (i % 50 === 0) { tickW = 16; lineWidth = 1.2; color = COLORS.tickMid; }
+            else if (i % 10 === 0) { tickW = 12; lineWidth = 1; color = COLORS.tickMid; }
+            else if (i % 5 === 0) { tickW = 8; lineWidth = 0.8; color = COLORS.tickMinor; }
+            else { tickW = 4; lineWidth = 0.5; color = COLORS.tickPixel; }
             ctx.strokeStyle = color;
             ctx.lineWidth = lineWidth;
             ctx.beginPath();
             ctx.moveTo(baseX, y + 0.5);
             ctx.lineTo(baseX - tickW, y + 0.5);
             ctx.stroke();
-
             if (i % 100 === 0) {
                 ctx.save();
                 ctx.font = 'bold 11px "Segoe UI", sans-serif';
@@ -246,19 +241,16 @@
                 ctx.restore();
             }
         }
-
         if (hoverValue >= 0 && hoverValue <= rulerLength) {
             const hy = hoverValue + START_PAD;
             ctx.fillStyle = COLORS.hoverBg;
             ctx.fillRect(0, Math.max(START_PAD, hy - 15), RULER_THICKNESS, 30);
-
             ctx.strokeStyle = COLORS.hoverLine;
             ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.moveTo(0, hy + 0.5);
             ctx.lineTo(RULER_THICKNESS, hy + 0.5);
             ctx.stroke();
-
             ctx.save();
             ctx.font = 'bold 10px "Segoe UI", sans-serif';
             ctx.fillStyle = COLORS.hoverLine;
@@ -273,10 +265,8 @@
 
     function drawResizeHandles() {
         const handleSize = 6;
-
         ctx.fillStyle = COLORS.resizeHint;
         ctx.globalAlpha = 0.6;
-
         if (isHorizontal) {
             roundRect(ctx, rulerLength + START_PAD + 2, RULER_THICKNESS / 2 - 10, handleSize, 20, 3);
             ctx.fill();
@@ -284,7 +274,6 @@
             roundRect(ctx, RULER_THICKNESS / 2 - 10, rulerLength + START_PAD + 2, 20, handleSize, 3);
             ctx.fill();
         }
-
         ctx.globalAlpha = 1;
     }
 
@@ -294,7 +283,6 @@
         const y = e.clientY - rect.top;
         const handlePos = rulerLength + START_PAD + 2;
         const handleEnd = handlePos + 8;
-
         if (isHorizontal) {
             if (x >= handlePos && x <= handleEnd) return 'right';
         } else {
@@ -320,13 +308,11 @@
         const y = e.clientY - rect.top;
         let over = false;
         const handleEnd = rulerLength + START_PAD + 12;
-
         if (isHorizontal) {
             over = x >= START_PAD && x <= handleEnd && y >= -30 && y <= RULER_THICKNESS + 30;
         } else {
             over = x >= -30 && x <= RULER_THICKNESS + 30 && y >= START_PAD && y <= handleEnd;
         }
-
         if (over && !isOnRuler) {
             isOnRuler = true;
             if (window.rulerBridge) window.rulerBridge.mouseOver();
@@ -334,12 +320,13 @@
             isOnRuler = false;
             if (window.rulerBridge) window.rulerBridge.mouseOut();
         }
-
         return over;
     }
 
     canvas.addEventListener('mousedown', function (e) {
+        hideContextMenu();
         if (e.button === 2) return;
+        if (colorPickerVisible) return;
 
         mouseDownPos = { x: e.clientX, y: e.clientY };
         hasMoved = false;
@@ -376,10 +363,8 @@
         }
 
         if (dragging && hasMoved) {
-            const x = e.clientX - dragOffsetX;
-            const y = e.clientY - dragOffsetY;
-            rulerX = x;
-            rulerY = y;
+            rulerX = e.clientX - dragOffsetX;
+            rulerY = e.clientY - dragOffsetY;
             canvas.style.left = rulerX + 'px';
             canvas.style.top = rulerY + 'px';
         }
@@ -408,10 +393,8 @@
             val = Math.max(0, Math.min(rulerLength, val));
             hoverValue = val;
             draw();
-
             tooltip.textContent = val + 'px / ' + rulerLength + 'px';
             tooltip.classList.add('visible');
-
             let tx, ty;
             if (isHorizontal) {
                 tx = e.clientX - tooltip.offsetWidth / 2;
@@ -422,37 +405,32 @@
             }
             tooltip.style.left = tx + 'px';
             tooltip.style.top = ty + 'px';
-
             const zone = getResizeZone(e);
-            if (zone === 'right') {
-                canvas.style.cursor = 'e-resize';
-            } else if (zone === 'bottom') {
-                canvas.style.cursor = 's-resize';
-            } else {
-                canvas.style.cursor = 'move';
-            }
+            if (zone === 'right') canvas.style.cursor = 'e-resize';
+            else if (zone === 'bottom') canvas.style.cursor = 's-resize';
+            else canvas.style.cursor = 'move';
         } else {
             if (hoverValue !== -1) {
                 hoverValue = -1;
                 draw();
             }
             tooltip.classList.remove('visible');
-
             const handleZone = getResizeZone(e);
-            if (handleZone) {
-                canvas.style.cursor = isHorizontal ? 'e-resize' : 's-resize';
-            } else {
-                canvas.style.cursor = 'default';
-            }
+            if (handleZone) canvas.style.cursor = isHorizontal ? 'e-resize' : 's-resize';
+            else canvas.style.cursor = 'default';
         }
     });
 
     document.addEventListener('mouseup', function (e) {
-        if (e.button === 0 && !hasMoved && isInRuler(e)) {
+        if (colorPickerVisible) {
+            dragging = false; resizing = false; resizeDir = '';
+            mouseDownPos = null; hasMoved = false;
+            return;
+        }
+
+        if (e.button === 0 && !hasMoved && mouseDownPos && isInRuler(e)) {
             const zone = getResizeZone(e);
-            if (!zone) {
-                toggleDirection();
-            }
+            if (!zone) toggleDirection();
         }
 
         dragging = false;
@@ -462,20 +440,12 @@
         hasMoved = false;
     });
 
-    canvas.addEventListener('contextmenu', function (e) {
-        e.preventDefault();
-        closeRuler();
-    });
-
     function toggleDirection() {
         const centerX = rulerX + (isHorizontal ? rulerLength / 2 : RULER_THICKNESS / 2);
         const centerY = rulerY + (isHorizontal ? RULER_THICKNESS / 2 : rulerLength / 2);
-
         isHorizontal = !isHorizontal;
-
         rulerX = centerX - (isHorizontal ? rulerLength / 2 : RULER_THICKNESS / 2);
         rulerY = centerY - (isHorizontal ? RULER_THICKNESS / 2 : rulerLength / 2);
-
         initCanvas();
         draw();
         saveState();
@@ -488,6 +458,249 @@
             window.close();
         }
     }
+
+    /* ========== Color conversion ========== */
+    function hsvToRgb(h, s, v) {
+        let r, g, b;
+        const i = Math.floor(h * 6);
+        const f = h * 6 - i;
+        const p = v * (1 - s);
+        const q = v * (1 - f * s);
+        const t = v * (1 - (1 - f) * s);
+        switch (i % 6) {
+            case 0: r = v; g = t; b = p; break;
+            case 1: r = q; g = v; b = p; break;
+            case 2: r = p; g = v; b = t; break;
+            case 3: r = p; g = q; b = v; break;
+            case 4: r = t; g = p; b = v; break;
+            case 5: r = v; g = p; b = q; break;
+        }
+        return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+    }
+
+    /* ========== Context menu ========== */
+    function showContextMenu(x, y) {
+        contextMenu.style.left = x + 'px';
+        contextMenu.style.top = y + 'px';
+        contextMenu.classList.add('show');
+    }
+    function hideContextMenu() {
+        contextMenu.classList.remove('show');
+    }
+
+    canvas.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        rightClickCount++;
+        if (rightClickCount === 1) {
+            rightClickTimer = setTimeout(function () {
+                rightClickCount = 0;
+                showContextMenu(e.clientX, e.clientY);
+            }, 250);
+        } else {
+            clearTimeout(rightClickTimer);
+            rightClickCount = 0;
+            closeRuler();
+        }
+    });
+
+    menuChangeBg.addEventListener('click', function (e) {
+        e.stopPropagation();
+        hideContextMenu();
+        openColorPicker();
+    });
+    menuClose.addEventListener('click', function (e) {
+        e.stopPropagation();
+        hideContextMenu();
+        closeRuler();
+    });
+
+    document.addEventListener('contextmenu', function () {
+        hideContextMenu();
+    });
+
+    /* ========== Color picker ========== */
+    function openColorPicker() {
+        drawSatBright();
+        drawHueBar();
+        drawAlphaBar();
+        positionSBCursor();
+        positionHueCursor();
+        positionAlphaCursor();
+        updateRgbaInput();
+        colorPicker.style.display = 'block';
+        colorPickerVisible = true;
+        positionColorPicker();
+        if (window.rulerBridge) window.rulerBridge.colorPickerShow();
+    }
+
+    function positionColorPicker() {
+        const pw = 320, ph = 340;
+        let px = (window.innerWidth - pw) / 2;
+        let py = (window.innerHeight - ph) / 2;
+        px = Math.max(10, Math.min(window.innerWidth - pw - 10, px));
+        py = Math.max(10, Math.min(window.innerHeight - ph - 10, py));
+        colorPicker.style.left = px + 'px';
+        colorPicker.style.top = py + 'px';
+    }
+
+    function closeColorPicker() {
+        colorPicker.style.display = 'none';
+        colorPickerVisible = false;
+        if (window.rulerBridge) window.rulerBridge.colorPickerHide();
+    }
+
+    function drawSatBright() {
+        const w = 256, h = 256;
+        const rgb = hsvToRgb(pickerHue, 1, 1);
+        const baseColor = 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+        const gradH = satBrightCtx.createLinearGradient(0, 0, w, 0);
+        gradH.addColorStop(0, '#fff');
+        gradH.addColorStop(1, baseColor);
+        satBrightCtx.fillStyle = gradH;
+        satBrightCtx.fillRect(0, 0, w, h);
+        const gradV = satBrightCtx.createLinearGradient(0, 0, 0, h);
+        gradV.addColorStop(0, 'rgba(0,0,0,0)');
+        gradV.addColorStop(1, 'rgba(0,0,0,1)');
+        satBrightCtx.fillStyle = gradV;
+        satBrightCtx.fillRect(0, 0, w, h);
+    }
+
+    function drawHueBar() {
+        const grad = hueCtx.createLinearGradient(0, 0, 0, 256);
+        grad.addColorStop(0, '#ff0000');
+        grad.addColorStop(1/6, '#ffff00');
+        grad.addColorStop(2/6, '#00ff00');
+        grad.addColorStop(3/6, '#00ffff');
+        grad.addColorStop(4/6, '#0000ff');
+        grad.addColorStop(5/6, '#ff00ff');
+        grad.addColorStop(1, '#ff0000');
+        hueCtx.fillStyle = grad;
+        hueCtx.fillRect(0, 0, 20, 256);
+    }
+
+    function drawAlphaBar() {
+        const rgb = hsvToRgb(pickerHue, pickerSat, pickerVal);
+        const grad = alphaCtx.createLinearGradient(0, 0, 276, 0);
+        grad.addColorStop(0, 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',0)');
+        grad.addColorStop(1, 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',1)');
+        alphaCtx.clearRect(0, 0, 276, 14);
+        alphaCtx.fillStyle = grad;
+        alphaCtx.fillRect(0, 0, 276, 14);
+    }
+
+    function positionSBCursor() {
+        sbCursor.style.left = (pickerSat * 256) + 'px';
+        sbCursor.style.top = ((1 - pickerVal) * 256) + 'px';
+    }
+    function positionHueCursor() {
+        hueCursor.style.top = (pickerHue * 256) + 'px';
+    }
+    function positionAlphaCursor() {
+        alphaCursor.style.left = (pickerAlpha * 276) + 'px';
+    }
+
+    function updateRgbaInput() {
+        const rgb = hsvToRgb(pickerHue, pickerSat, pickerVal);
+        rgbaInput.value = 'rgba(' + rgb[0] + ', ' + rgb[1] + ', ' + rgb[2] + ', ' + pickerAlpha.toFixed(1) + ')';
+    }
+
+    function applyBgFromPicker() {
+        const rgb = hsvToRgb(pickerHue, pickerSat, pickerVal);
+        bgR = rgb[0]; bgG = rgb[1]; bgB = rgb[2]; bgA = pickerAlpha;
+        COLORS.bgGradientStart = 'rgba(' + bgR + ',' + bgG + ',' + bgB + ',' + bgA + ')';
+        COLORS.bgGradientEnd = 'rgba(' + Math.max(0, bgR - 25) + ',' + Math.max(0, bgG - 20) + ',' + Math.max(0, bgB - 15) + ',' + bgA + ')';
+        draw();
+    }
+
+    /* --- SB area events --- */
+    function handleSBMove(e) {
+        const rect = satBrightCanvas.getBoundingClientRect();
+        let x = Math.max(0, Math.min(255, e.clientX - rect.left));
+        let y = Math.max(0, Math.min(255, e.clientY - rect.top));
+        pickerSat = x / 255;
+        pickerVal = 1 - y / 255;
+        positionSBCursor();
+        drawAlphaBar();
+        updateRgbaInput();
+        applyBgFromPicker();
+    }
+    satBrightCanvas.addEventListener('mousedown', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        draggingSB = true;
+        handleSBMove(e);
+    });
+
+    /* --- Hue events --- */
+    function handleHueMove(e) {
+        const rect = hueCanvas.getBoundingClientRect();
+        let y = Math.max(0, Math.min(255, e.clientY - rect.top));
+        pickerHue = y / 255;
+        positionHueCursor();
+        drawSatBright();
+        drawAlphaBar();
+        updateRgbaInput();
+        applyBgFromPicker();
+    }
+    hueCanvas.addEventListener('mousedown', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        draggingHue = true;
+        handleHueMove(e);
+    });
+
+    /* --- Alpha events --- */
+    function handleAlphaMove(e) {
+        const rect = alphaCanvas.getBoundingClientRect();
+        let x = Math.max(0, Math.min(275, e.clientX - rect.left));
+        pickerAlpha = Math.round((x / 275) * 10) / 10;
+        positionAlphaCursor();
+        updateRgbaInput();
+        applyBgFromPicker();
+    }
+    alphaCanvas.addEventListener('mousedown', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        draggingAlpha = true;
+        handleAlphaMove(e);
+    });
+
+    /* --- Global mouse for picker drag --- */
+    document.addEventListener('mousemove', function (e) {
+        if (draggingSB) handleSBMove(e);
+        if (draggingHue) handleHueMove(e);
+        if (draggingAlpha) handleAlphaMove(e);
+    });
+    document.addEventListener('mouseup', function () {
+        draggingSB = false;
+        draggingHue = false;
+        draggingAlpha = false;
+    });
+
+    /* --- Picker buttons --- */
+    btnConfirm.addEventListener('click', function (e) {
+        e.stopPropagation();
+        saveState();
+        closeColorPicker();
+    });
+    btnClear.addEventListener('click', function (e) {
+        e.stopPropagation();
+        pickerHue = 0; pickerSat = 1; pickerVal = 1; pickerAlpha = 1;
+        bgR = 45; bgG = 55; bgB = 72; bgA = 1.0;
+        COLORS.bgGradientStart = '#2d3748';
+        COLORS.bgGradientEnd = '#4a5568';
+        draw();
+        saveState();
+        closeColorPicker();
+    });
+
+    /* --- Close picker on left click outside --- */
+    document.addEventListener('mousedown', function (e) {
+        if (!colorPickerVisible) return;
+        if (colorPicker.contains(e.target)) return;
+        closeColorPicker();
+    });
 
     function centerRuler() {
         const totalLength = rulerLength + START_PAD * 2;

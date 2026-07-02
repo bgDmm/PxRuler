@@ -1,6 +1,7 @@
 const { ipcRenderer } = require('electron');
 
 let rulerWindow = null;
+let colorPickerActive = false;
 
 function createRulerWindow() {
     if (rulerWindow && !rulerWindow.isDestroyed()) {
@@ -57,6 +58,20 @@ function createRulerWindow() {
     });
 
     ipcRenderer.on('ruler-mouse-out', () => {
+        if (rulerWindow && !rulerWindow.isDestroyed() && !colorPickerActive) {
+            rulerWindow.setIgnoreMouseEvents(true, { forward: true });
+        }
+    });
+
+    ipcRenderer.on('ruler-color-picker-show', () => {
+        colorPickerActive = true;
+        if (rulerWindow && !rulerWindow.isDestroyed()) {
+            rulerWindow.setIgnoreMouseEvents(false);
+        }
+    });
+
+    ipcRenderer.on('ruler-color-picker-hide', () => {
+        colorPickerActive = false;
         if (rulerWindow && !rulerWindow.isDestroyed()) {
             rulerWindow.setIgnoreMouseEvents(true, { forward: true });
         }

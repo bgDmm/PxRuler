@@ -9,6 +9,37 @@
 <body>
     <canvas id="rulerCanvas"></canvas>
     <div id="tooltip"></div>
+
+    <div id="contextMenu" class="context-menu">
+        <div class="context-menu-item" id="menuChangeBg">修改背景色</div>
+        <div class="context-menu-item" id="menuClose">关闭</div>
+    </div>
+
+    <div id="colorPicker" class="color-picker">
+        <div class="picker-body">
+            <div class="sat-bright-area">
+                <canvas id="satBrightCanvas" width="256" height="256"></canvas>
+                <div id="sbCursor" class="sb-cursor"></div>
+            </div>
+            <div class="hue-slider">
+                <canvas id="hueCanvas" width="20" height="256"></canvas>
+                <div id="hueCursor" class="hue-cursor"></div>
+            </div>
+        </div>
+        <div class="alpha-row">
+            <div class="alpha-slider">
+                <div class="alpha-checker"></div>
+                <canvas id="alphaCanvas" width="276" height="14"></canvas>
+                <div id="alphaCursor" class="alpha-cursor"></div>
+            </div>
+        </div>
+        <div class="picker-footer">
+            <input type="text" id="rgbaInput" class="rgba-input" readonly>
+            <button id="btnClear" class="picker-btn picker-btn-clear">清空</button>
+            <button id="btnConfirm" class="picker-btn picker-btn-ok">确定</button>
+        </div>
+    </div>
+
     <script src="ruler.js"></script>
 </body>
 </html>
