@@ -1,0 +1,36 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: transparent;
+    overflow: hidden;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    user-select: none;
+}
+
+#rulerCanvas {
+    position: absolute;
+}
+
+#tooltip {
+    position: fixed;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 9999;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+}
+
+#tooltip.visible {
+    opacity: 1;
+}
