@@ -130,6 +130,7 @@
 
     let hoverValue = -1;
     let isOnRuler = false;
+    let lastMousePos = null;
     let dpr = window.devicePixelRatio || 1;
 
     // Background color
@@ -422,6 +423,7 @@
     });
 
     document.addEventListener('mousemove', function (e) {
+        lastMousePos = { clientX: e.clientX, clientY: e.clientY };
         checkMouseOverRuler(e);
 
         if (mouseDownPos) {
@@ -618,6 +620,15 @@
         colorPicker.style.display = 'none';
         colorPickerVisible = false;
         if (window.rulerBridge) window.rulerBridge.colorPickerHide();
+        // 宿主收到 color-picker-hide 后会无条件恢复鼠标穿透。而此刻指针通常仍停在
+        // 标尺上，isOnRuler 一直是 true（从没移出过），于是 over && !isOnRuler 恒为假、
+        // 再也补发不出 mouse-over，窗口就卡死在穿透态：光标变回箭头、右键失效，
+        // 必须手动移出再移入一次才能重置标志位。这里主动重置并按最后已知指针位置
+        // 重新判定，让穿透状态立刻与实际指针位置对齐。
+        isOnRuler = false;
+        if (lastMousePos) {
+            checkMouseOverRuler(lastMousePos);
+        }
     }
 
     function drawSatBright() {
