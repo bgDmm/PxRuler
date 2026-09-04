@@ -20,8 +20,61 @@
         label: '#ffffff',
         hoverLine: '#667eea',
         hoverBg: 'rgba(102, 126, 234, 0.2)',
+        resizeHint: '#a0aec0',
+        labelStroke: 'rgba(0, 0, 0, 0.7)'
+    };
+
+    // 背景偏亮时使用的深色前景配色
+    const THEME_ON_LIGHT = {
+        tickMajor: '#1a202c',
+        tickMid: '#2d3748',
+        tickMinor: '#4a5568',
+        label: '#1a202c',
+        labelStroke: 'rgba(255, 255, 255, 0.85)',
+        hoverLabel: '#3730a3',
+        resizeHint: '#4a5568'
+    };
+
+    // 背景偏暗时使用的浅色前景配色
+    const THEME_ON_DARK = {
+        tickMajor: '#ffffff',
+        tickMid: '#cbd5e0',
+        tickMinor: '#a0aec0',
+        label: '#ffffff',
+        labelStroke: 'rgba(0, 0, 0, 0.7)',
+        hoverLabel: '#a5b4fc',
         resizeHint: '#a0aec0'
     };
+
+    const SCREEN_GUESS = 245;
+    const LUM_THRESHOLD = 0.18;
+
+    function channelLum(c) {
+        const v = c / 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    }
+
+    function relativeLuminance(r, g, b) {
+        return 0.2126 * channelLum(r) + 0.7152 * channelLum(g) + 0.0722 * channelLum(b);
+    }
+
+    function updateForegroundTheme() {
+        const endR = Math.max(0, bgR - 25);
+        const endG = Math.max(0, bgG - 20);
+        const endB = Math.max(0, bgB - 15);
+        // 渐变两端取中点；半透明时与假定的浅色屏幕底色混合
+        const r = ((bgR + endR) / 2) * bgA + SCREEN_GUESS * (1 - bgA);
+        const g = ((bgG + endG) / 2) * bgA + SCREEN_GUESS * (1 - bgA);
+        const b = ((bgB + endB) / 2) * bgA + SCREEN_GUESS * (1 - bgA);
+        const theme = relativeLuminance(r, g, b) > LUM_THRESHOLD ? THEME_ON_LIGHT : THEME_ON_DARK;
+        COLORS.tickMajor = theme.tickMajor;
+        COLORS.tickMid = theme.tickMid;
+        COLORS.tickMinor = theme.tickMinor;
+        COLORS.label = theme.label;
+        COLORS.labelStroke = theme.labelStroke;
+        COLORS.hoverLabel = theme.hoverLabel;
+        COLORS.resizeHint = theme.resizeHint;
+    }
 
     let isHorizontal = true;
     let rulerLength = DEFAULT_LENGTH;
@@ -134,6 +187,7 @@
     }
 
     function draw() {
+        updateForegroundTheme();
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
         drawRulerBackground();
@@ -193,7 +247,7 @@
                 ctx.textBaseline = 'bottom';
                 ctx.lineJoin = 'round';
                 ctx.lineWidth = 3;
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.strokeStyle = COLORS.labelStroke;
                 ctx.strokeText(i + '', x, baseY - tickH - 3);
                 ctx.fillStyle = COLORS.label;
                 ctx.fillText(i + '', x, baseY - tickH - 3);
@@ -214,9 +268,9 @@
             ctx.textBaseline = 'top';
             ctx.lineJoin = 'round';
             ctx.lineWidth = 3;
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.strokeStyle = COLORS.labelStroke;
             ctx.strokeText(hoverValue + '', hx, 4);
-            ctx.fillStyle = COLORS.hoverLine;
+            ctx.fillStyle = COLORS.hoverLabel;
             ctx.fillText(hoverValue + '', hx, 4);
         }
     }
@@ -246,7 +300,7 @@
                 ctx.textBaseline = 'bottom';
                 ctx.lineJoin = 'round';
                 ctx.lineWidth = 3;
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.strokeStyle = COLORS.labelStroke;
                 ctx.strokeText(i + '', 0, 0);
                 ctx.fillStyle = COLORS.label;
                 ctx.fillText(i + '', 0, 0);
@@ -271,9 +325,9 @@
             ctx.textBaseline = 'top';
             ctx.lineJoin = 'round';
             ctx.lineWidth = 3;
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.strokeStyle = COLORS.labelStroke;
             ctx.strokeText(hoverValue + '', 0, 0);
-            ctx.fillStyle = COLORS.hoverLine;
+            ctx.fillStyle = COLORS.hoverLabel;
             ctx.fillText(hoverValue + '', 0, 0);
             ctx.restore();
         }
