@@ -180,7 +180,7 @@
             else if (i % 50 === 0) { tickH = 16; lineWidth = 1.2; color = COLORS.tickMid; }
             else if (i % 10 === 0) { tickH = 12; lineWidth = 1; color = COLORS.tickMid; }
             else if (i % 5 === 0) { tickH = 8; lineWidth = 0.8; color = COLORS.tickMinor; }
-            else { tickH = 4; lineWidth = 0.5; color = COLORS.tickPixel; }
+            else { continue; }
             ctx.strokeStyle = color;
             ctx.lineWidth = lineWidth;
             ctx.beginPath();
@@ -189,9 +189,13 @@
             ctx.stroke();
             if (i % 100 === 0) {
                 ctx.font = 'bold 11px "Segoe UI", sans-serif';
-                ctx.fillStyle = COLORS.label;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
+                ctx.lineJoin = 'round';
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.strokeText(i + '', x, baseY - tickH - 3);
+                ctx.fillStyle = COLORS.label;
                 ctx.fillText(i + '', x, baseY - tickH - 3);
             }
         }
@@ -206,9 +210,13 @@
             ctx.lineTo(hx + 0.5, RULER_THICKNESS);
             ctx.stroke();
             ctx.font = 'bold 10px "Segoe UI", sans-serif';
-            ctx.fillStyle = COLORS.hoverLine;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.strokeText(hoverValue + '', hx, 4);
+            ctx.fillStyle = COLORS.hoverLine;
             ctx.fillText(hoverValue + '', hx, 4);
         }
     }
@@ -222,7 +230,7 @@
             else if (i % 50 === 0) { tickW = 16; lineWidth = 1.2; color = COLORS.tickMid; }
             else if (i % 10 === 0) { tickW = 12; lineWidth = 1; color = COLORS.tickMid; }
             else if (i % 5 === 0) { tickW = 8; lineWidth = 0.8; color = COLORS.tickMinor; }
-            else { tickW = 4; lineWidth = 0.5; color = COLORS.tickPixel; }
+            else { continue; }
             ctx.strokeStyle = color;
             ctx.lineWidth = lineWidth;
             ctx.beginPath();
@@ -232,11 +240,15 @@
             if (i % 100 === 0) {
                 ctx.save();
                 ctx.font = 'bold 11px "Segoe UI", sans-serif';
-                ctx.fillStyle = COLORS.label;
                 ctx.translate(baseX - tickW - 3, y);
                 ctx.rotate(-Math.PI / 2);
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
+                ctx.lineJoin = 'round';
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.strokeText(i + '', 0, 0);
+                ctx.fillStyle = COLORS.label;
                 ctx.fillText(i + '', 0, 0);
                 ctx.restore();
             }
@@ -253,11 +265,15 @@
             ctx.stroke();
             ctx.save();
             ctx.font = 'bold 10px "Segoe UI", sans-serif';
-            ctx.fillStyle = COLORS.hoverLine;
             ctx.translate(4, hy);
             ctx.rotate(-Math.PI / 2);
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.strokeText(hoverValue + '', 0, 0);
+            ctx.fillStyle = COLORS.hoverLine;
             ctx.fillText(hoverValue + '', 0, 0);
             ctx.restore();
         }
